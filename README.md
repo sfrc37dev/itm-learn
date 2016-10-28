@@ -8,4 +8,6 @@ The ITM software was developed by NTIA. NTIA does not make any warranty of any k
 
 The owners of this repository likewise make no warranty of any kind, express or implied, ncluding, without limitation, the implied warranty of merchantability, fitness for a particular purpose, non-infringement and data accuracy. The works in this repository are created solely for the educational benefit of the owners. If you wish to use the Irregular Terrain Model in your system, please go to http://www.its.bldrdoc.gov/resources/radio-propagation-software/itm/itm.aspx and use the official ITS version found there.
 
-The works created in this repository (itm-learn) are licensed to the United States Government freely and without restriction of any kind.
+The authors hereby grant the United States Government unlimited rights, as defined in clause 252.227-7014 of the Defense Federal Acquisition Regulation Supplement (DFARS), to all works contained in this repository (itm-learn). All others are granted a license to the works in this repository (itm-learn), except those already in the public domain (the original ITM code, but not any derivative works), according to the terms of the MIT License.
+
+(C) 2016 Stuart Schutta
