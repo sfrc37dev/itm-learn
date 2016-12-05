@@ -446,6 +446,9 @@ void /*DllExport _stdcall*/ lrprop (double d,
 	double q;
 	int j;
 
+	/** LRprop 5
+	 *
+	 */
 	/** \internal The value of mdp controls some of the program flow.
 	 *  When it equals -1
 	 *  we are in the point-to-point mode, when 1 we are beginning the area
@@ -454,49 +457,69 @@ void /*DllExport _stdcall*/ lrprop (double d,
 	 *  for varying distances.
 	 *
 	 */
-	if(prop.mdp!=0)
+	if(prop.mdp != 0)
 	{
 		/** \internal Do secondary parameters
 		 *
 		 */
-		for(j=0;j<2;j++)
+		for(j=0; j<2; j++)
 			propa.dls[j] = sqrt(2.0*prop.he[j]/prop.gme);	//Alg 3.5
 		propa.dlsa = propa.dls[0]+propa.dls[1];				//Alg 3.6
 		propa.dla  = prop.dl[0]+prop.dl[1];					//Alg 3.7
-		propa.tha  = mymax(prop.the[0]+prop.the[1],-propa.dla*prop.gme); //Alg 3.8
+		propa.tha  = mymax(prop.the[0] + prop.the[1],
+				-propa.dla * prop.gme); //Alg 3.8
 		wlos  = false;
 		wscat = false;
 
 		/** \internal Check parameter ranges
 		 *
 		 */
-		if(prop.wn<0.838 || prop.wn>210.0)
+		/** \internal check wave number
+		 *
+		 */
+		if(prop.wn < 0.838 || prop.wn > 210.0)
 		{
-			prop.kwx=mymax(prop.kwx,1);
+			prop.kwx = mymax(prop.kwx, 1);
 		}
-		for(j=0;j<2;j++)
-			if(prop.hg[j]<1.0 || prop.hg[j]>1000.0)
-			{ prop.kwx=mymax(prop.kwx,1);
-			}
-		for(j=0;j<2;j++)
-			if( abs(prop.the[j]) >200e-3 || prop.dl[j]<0.1*propa.dls[j] ||
-					prop.dl[j]>3.0*propa.dls[j] )
+		/** \internal check antenna heights
+		 *
+		 */
+		for(j=0; j<2; j++)
+			if(prop.hg[j] < 1.0 || prop.hg[j] > 1000.0)
 			{
-				prop.kwx=mymax(prop.kwx,3);
+				prop.kwx = mymax(prop.kwx, 1);
 			}
+		/** \internal check horizon angles and distances
+		 *
+		 */
+		for(j=0; j<2; j++)
+			if( abs(prop.the[j]) > 200e-3 || prop.dl[j] < 0.1*propa.dls[j] ||
+					prop.dl[j] > 3.0*propa.dls[j] )
+			{
+				prop.kwx = mymax(prop.kwx, 3);
+			}
+        /** \internal check:
+         *  refractivity
+         *  earth curvature
+         *  ground impedance
+         *  wave number
+         */
 		if( prop.ens < 250.0   || prop.ens > 400.0  ||
 				prop.gme < 75e-9 || prop.gme > 250e-9 ||
 				prop_zgnd.real() <= abs(prop_zgnd.imag()) ||
-				prop.wn  < 0.419   || prop.wn  > 420.0 )
+				prop.wn  < 0.419 || prop.wn  > 420.0 )
 		{
-			prop.kwx=4;
+			prop.kwx = 4;
 		}
-		for(j=0;j<2;j++)
-			if(prop.hg[j]<0.5 || prop.hg[j]>3000.0)
+		/** \internal check antenna heights
+		 *
+		 */
+		for(j=0; j<2; j++)
+			if(prop.hg[j] < 0.5 || prop.hg[j] > 3000.0)
 			{
-				prop.kwx=4;
+				prop.kwx = 4;
 			}
-		dmin=abs(prop.he[0]-prop.he[1])/200e-3;
+		dmin = abs(prop.he[0] - prop.he[1]) / 200e-3;
 
 		/** \internal The Diffraction Region.
 		 *  This is the region beyond the smooth-earth horizon at dLsa and
@@ -508,22 +531,24 @@ void /*DllExport _stdcall*/ lrprop (double d,
 		/** \internal Diffraction coefficients
 		 *
 		 */
-		q   = adiff(0.0,prop,propa);
-		xae = pow(prop.wn*pow(prop.gme,2),-THIRD);		//Alg 4.2
-		d3  = mymax(propa.dlsa,1.3787*xae+propa.dla);	//Alg 4.3
-		d4  = d3+2.7574*xae;							//Alg 4.4
-		a3  = adiff(d3,prop,propa);						//Alg 4.5
-		a4  = adiff(d4,prop,propa);						//Alg 4.6
-		propa.emd = (a4-a3)/(d4-d3);					//Alg 4.7
-		propa.aed = a3-propa.emd*d3;					//Alg 4.8
+		q   = adiff(0.0, prop, propa);
+		xae = pow(prop.wn * pow(prop.gme, 2), -THIRD);	//Alg 4.2
+		d3  = mymax(propa.dlsa, 1.3787*xae + propa.dla);//Alg 4.3
+		d4  = d3 + 2.7574*xae;							//Alg 4.4
+		a3  = adiff(d3, prop, propa);					//Alg 4.5
+		a4  = adiff(d4, prop, propa);					//Alg 4.6
+		propa.emd = (a4-a3) / (d4-d3);					//Alg 4.7
+		propa.aed = a3 - propa.emd*d3;					//Alg 4.8
 	}
 
-
+    /** \internal We are starting or continuing area mode.
+     */
 	if(prop.mdp >= 0)
 	{
 		prop.mdp  = 0;
 		prop.dist = d;
 	}
+
 
 	if(prop.dist > 0.0)
 	{
@@ -532,17 +557,18 @@ void /*DllExport _stdcall*/ lrprop (double d,
 		 */
 		if(prop.dist > 1000e3)
 		{
-			prop.kwx = mymax(prop.kwx,1);
+			prop.kwx = mymax(prop.kwx, 1);
 		}
 		if(prop.dist < dmin)
 		{
-			prop.kwx = mymax(prop.kwx,3);
+			prop.kwx = mymax(prop.kwx, 3);
 		}
 		if(prop.dist < 1e3 || prop.dist > 2000e3)
 		{
 			prop.kwx = 4;
 		}
 	}
+
 
 	if(prop.dist < propa.dlsa)
 	{
@@ -554,81 +580,96 @@ void /*DllExport _stdcall*/ lrprop (double d,
 			/** \internal Line-of-sight coefficients
 			 *
 			 */
-			q = alos(0.0,prop,propa);
+			q = alos(0.0, prop, propa);
 			d2 = propa.dlsa;
 			a2 = propa.aed + d2*propa.emd;
-			d0 = 1.908 * prop.wn * prop.he[0] * prop.he[1];
+			d0 = 1.908 * prop.wn * prop.he[0] * prop.he[1];			//Alg 4.38
 			if(propa.aed >= 0.0)
 			{
-				d0 = mymin(d0, 0.5*propa.dla);
-				d1 = d0 + 0.25*(propa.dla - d0);
+				d0 = mymin(d0, 0.5*propa.dla);						//Alg 4.28
+				d1 = d0 + 0.25*(propa.dla - d0);					//Alg 4.29
 			}
 			else
-				d1 = mymax(-propa.aed/propa.emd, 0.25*propa.dla);
-			a1 = alos(d1, prop,propa);
+				d1 = mymax(-propa.aed/propa.emd, 0.25*propa.dla);	//Alg 4.39
+			a1 = alos(d1, prop, propa);								//Alg 4.31
 			wq = false;
 			if(d0 < d1)
 			{
-				a0=alos(d0,prop,propa);
-				q=log(d2/d0);
-				propa.ak2=mymax(0.0,((d2-d0)*(a1-a0)-(d1-d0)*(a2-a0)) /
-						((d2-d0)*log(d1/d0)-(d1-d0)*q));
-				wq=propa.aed>=0.0 || propa.ak2>0.0;
+				a0 = alos(d0, prop, propa);							//Alg 4.30
+				q  = log(d2/d0);
+				propa.ak2 = mymax(0.0, ((d2-d0)*(a1-a0) - (d1-d0)*(a2-a0)) /
+						((d2-d0)*log(d1/d0) - (d1-d0)*q));			//Alg 4.32
+				wq = propa.aed >= 0.0 || propa.ak2 > 0.0;
 				if(wq)
 				{
-					propa.ak1=(a2-a0-propa.ak2*q)/(d2-d0);
-					if(propa.ak1<0.0)
+					propa.ak1 = (a2 - a0 - propa.ak2*q) / (d2-d0);	//Alg 4.33
+					if(propa.ak1 < 0.0)
 					{
-						propa.ak1=0.0;
-						propa.ak2=FORTRAN_DIM(a2,a0)/q;
-						if(propa.ak2==0.0)
-							propa.ak1=propa.emd;
-					}
-				}
-			}
+						propa.ak1 = 0.0;							//Alg 4.36
+						propa.ak2 = FORTRAN_DIM(a2, a0) / q;		//Alg 4.35
+						if(propa.ak2 == 0.0)
+							propa.ak1 = propa.emd;					//Alg 4.37
+					} //end if
+				} //end if
+			} //end if
 			if(!wq)
 			{
-				propa.ak1=FORTRAN_DIM(a2,a1)/(d2-d1);
-				propa.ak2=0.0;
-				if(propa.ak1==0.0)	propa.ak1=propa.emd;
+				propa.ak1 = FORTRAN_DIM(a2, a1) / (d2-d1);			//Alg 4.40
+				propa.ak2 = 0.0;									//Alg 4.41
+				if(propa.ak1 == 0.0)
+					propa.ak1 = propa.emd;							//Alg 4.37
 			}
-			propa.ael=a2-propa.ak1*d2-propa.ak2*log(d2);
-			wlos=true;
-		}
-		if(prop.dist>0.0)
-			prop.aref=propa.ael+propa.ak1*prop.dist +
+			propa.ael = a2 - propa.ak1*d2 - propa.ak2*log(d2);		//Alg 4.42
+			wlos = true;
+		} //end if(!wlos)
+
+		if(prop.dist > 0.0)
+			prop.aref = propa.ael + propa.ak1*prop.dist +			//Alg 4.1
 			propa.ak2*log(prop.dist);
 	}
-	if(prop.dist<=0.0 || prop.dist>=propa.dlsa)
+
+	if(prop.dist <= 0.0 || prop.dist >= propa.dlsa)
 	{
+		/** \internal Troposcatter calculations 20
+		 *
+		 */
 		if(!wscat)
 		{
-			q=ascat(0.0,prop,propa);
-			d5=propa.dla+200e3;
-			d6=d5+200e3;
-			a6=ascat(d6,prop,propa);
-			a5=ascat(d5,prop,propa);
-			if(a5<1000.0)
-			{ propa.ems=(a6-a5)/200e3;
-			propa.dx=mymax(propa.dlsa,mymax(propa.dla+0.3*xae *
-					log(47.7*prop.wn),(a5-propa.aed-propa.ems*d5) /
-					(propa.emd-propa.ems)));
-			propa.aes=(propa.emd-propa.ems)*propa.dx+propa.aed;
+			/** \internal Troposcatter coefficients 21
+			 *
+			 */
+			q  = ascat(0.0, prop, propa);
+			d5 = propa.dla + 200e3;			//Alg 4.52
+			d6 = d5 + 200e3;				//Alg 4.53
+			a6 = ascat(d6, prop, propa);	//Alg 4.54
+			a5 = ascat(d5, prop, propa);	//Alg 4.55
+
+			if(a5 < 1000.0)
+			{
+				propa.ems = (a6-a5) / 200e3;						//Alg 4.57
+				propa.dx  = mymax(propa.dlsa,						//Alg 4.58
+						mymax(propa.dla + 0.3*xae*log(47.7*prop.wn),
+								(a5-propa.aed-propa.ems*d5) /
+								(propa.emd-propa.ems)));
+			propa.aes = (propa.emd-propa.ems)*propa.dx + propa.aed;	//Alg 4.59
 			}
 			else
 			{
-				propa.ems=propa.emd;
-				propa.aes=propa.aed;
-				propa.dx=10.e6;
+				propa.ems = propa.emd;
+				propa.aes = propa.aed;
+				propa.dx  = 10.e6;		//Alg 4.56
 			}
-			wscat=true;
+			//end 21
+			wscat = true;
 		}
-		if(prop.dist>propa.dx)
-			prop.aref=propa.aes+propa.ems*prop.dist;
+		if(prop.dist > propa.dx)
+			prop.aref = propa.aes + propa.ems*prop.dist;
 		else
-			prop.aref=propa.aed+propa.emd*prop.dist;
+			prop.aref = propa.aed + propa.emd*prop.dist;	//Alg 4.1
 	}
-	prop.aref=mymax(prop.aref,0.0);
+	//end 20
+	//end 5
+	prop.aref = mymax(prop.aref, 0.0);
 }
 
 double curve (double const &c1, double const &c2, double const &x1,
