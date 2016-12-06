@@ -50,23 +50,165 @@ struct tcomplex
 	double tcimag;
 };
 
+/** Primary input parameters and output values.
+ *
+ * This struct performs the role of one of the two common blocks in the
+ * original Fortran code. All but two of the values (aref and kwx) are inputs
+ * to the Longley-Rice propagation program.
+ *
+ */
 struct prop_type
 {
+	/** Reference attenuation \f$A_{ref}\f$
+	 *
+	 * This is the *median* attenuation relative to a free space signal that
+	 * should be observed on the set of all similar paths during times when
+	 * the atmospheric conditions correspond to a standard, well-mixed,
+	 * atmosphere (Hufford, 4).
+	 *
+	 */
 	double aref;
+
+	/** Distance \f$d\f$
+	 *
+	 * This is the distance between the two terminals.
+	 *
+	 */
 	double dist;
+
+	/** Antenna structural heights \f$h_{g1}, h_{g2}\f$
+	 *
+	 */
 	double hg[2];
+
+	/** Wave number (radio frequency) \f$k\f$
+	 *
+	 * Measured in units of reciprocal lengths; the wave number is that of the
+	 * carrier or central frequency. It is defined to be
+	 *
+	 * \f$k=2\pi/\lambda=f/f_{0}\f$
+	 *
+	 * with \f$f_{0}=47.70\f$ MHz\f$\cdot\f$ m
+	 *
+	 * where \f$\lambda\f$ is the wave length, \f$f\f$ the frequency. The
+	 * speed of light in air is assumed to be 299.7 m/\f$\mu\f$s (Hufford, 3).
+	 *
+	 */
 	double wn;
+
+	/** Terrain irregularity parameter \f$\Delta h\f$
+	 *
+	 */
 	double dh;
+
+	/** Minimum monthly mean surface refractivity \f$N_{s}\f$
+	 *
+	 * Measured in N-units; to simplify its representation, the surface
+	 * refractivity is sometimes given in terms of \f$N_{0}\f$, the surface
+	 * refractivity "reduced to sea level." When this is the situation, one
+	 * must know the general elevation, \f$z_{s}\f$ of the region involved,
+	 * and then
+	 *
+	 * \f$N_{s}=N_{0}e^{-z_{s}/z_{1}}\f$
+	 *
+	 * with \f$z_{1}=9.46\f$ km.
+	 *
+	 */
 	double ens;
+
+	/** Earth's effective curvature \f$\gamma_{e}\f$
+	 *
+	 * Measured in units of reciprocal length; the earth's effective curvature
+	 * is the reciprocal of the earth's effective radius and may be expressed
+	 * as
+	 *
+	 * \f$\gamma_{e}=\gamma_{a}(1-0.04665e^{N_{s}/N_{1}})\f$
+	 *
+	 * where \f$N_{1}=179.3\f$ N-units,
+	 * and \f$\gamma_{a}=157\cdot10^{-9}\f$ m\f$ ^{-1}=157\f$ N-units/km
+	 *
+	 * (Hufford, 3)
+	 *
+	 */
 	double gme;
+
+	/** Surface transfer impedance of the ground \f$\Re Z_{g}\f$
+	 *
+	 * A complex, dimensionless number; the "surface transfer impedance" is
+	 * normally defined in terms of the relative permittivity \f$\epsilon_{r}\f$
+	 * and conductivity \f$\sigma\f$ of the ground, and the polarization of the
+	 * radio waves involved. In these terms, we have
+	 *
+	 * \f$Z_{g}=\sqrt{\epsilon_{r}' - 1}\f$
+	 * horizontal polarization
+	 *
+	 * \f$Z_{g}=\sqrt{\epsilon_{r}' - 1}/\epsilon_{r}'\f$
+	 * vertical polarization
+	 *
+	 * where \f$\epsilon_{r}'\f$ is the "complex relative permittivity" defined
+	 * by
+	 *
+	 * \f$\epsilon_{r}'=\epsilon_{r}+iZ_{0}\sigma/k\f$, \f$Z_{0}=376.62\Omega\f$
+	 *
+	 * The conductivity \f$\sigma\f$ is normally expressed in siemens
+	 * (reciprocal ohms) per meter. (Hufford, 3)
+	 *
+	 */
 	double zgndreal;
+
+	/** Surface transfer impedance of the ground \f$\Im Z_{g}\f$
+	 *
+	 */
 	double zgndimag;
+
+	/** Antenna effective heights \f$h_{e1}, h_{e2}\f$
+	 *
+	 * The "effective height" of an antenna is its height above an "effective
+	 * reflecting plane" or above the "intermediate foreground" between the
+	 * antenna and its horizon. A difficulty with the model is that there is
+	 * no explicit definition of this quantity, and the accuracy of the model
+	 * sometimes depends on the skill of the user in estimating values for
+	 * these effective heights. (Hufford, 4)
+	 *
+	 */
 	double he[2];
+
+	/** Horizon distances \f$d_{L1}, d_{L2}\f$
+	 *
+	 * Distance from each terminal to its radio horizon. In the case of a
+	 * line-of-sight path there are no horizons, but the model still requires
+	 * values for \f$d_{Lj}\f$. They should be dtermined from the formulas
+	 * used in the area prediction mode and (give reference). Now it may
+	 * happen that after these computations one discovers
+	 * \f$ d > d_{L} = d_{L1} + d_{L2} \f$, implying that the path is a
+	 * beyond-horizon one. Noting that \f$d_{L}\f$ is a monotone increasing
+	 * function of the \f$h_{ej}\f$ we can assume these latter have been
+	 * underestimated and that they should be increased by a common factor
+	 * until \f$d_{L} = d\f$.
+	 * (Hufford, 4)
+	 *
+	 */
 	double dl[2];
+
+	/** Horizon elevation angles \f$\theta_{e1}, \theta_{e2}\f$
+	 *
+	 * Elevation angles of the horizons from each terminal at the height
+	 * of the antennas. These are measured in radians.
+	 *
+	 */
 	double the[2];
+
+	/** Error indicator
+	 *
+	 */
 	int kwx;
+
+	/** Mode
+	 *
+	 */
 	int mdp;
 };
+
 
 struct propv_type
 {
@@ -76,19 +218,56 @@ struct propv_type
 	int klim;
 };
 
+/** Secondary derived parameters
+ *
+ * This struct performs the role of the other of the two common blocks in
+ * the original Fortran code. All of these parameters are computed by lrprop().
+ *
+ */
 struct propa_type
 {
+	/** Line-of-sight distance
+	 *
+	 */
 	double dlsa;
+
+	/** Scatter distance
+	 *
+	 */
 	double dx;
+
+	/** Line-of-sight coefficients
+	 *
+	 */
 	double ael;
 	double ak1;
 	double ak2;
+
+	/** Diffraction coefficients
+	 *
+	 */
 	double aed;
 	double emd;
+
+	/** Scatter coefficients
+	 *
+	 */
 	double aes;
 	double ems;
+
+	/** Smooth earth horizon distances
+	 *
+	 */
 	double dls[2];
+
+	/** Total horizon distance
+	 *
+	 */
 	double dla;
+
+	/** Total bending angle
+	 *
+	 */
 	double tha;
 };
 
