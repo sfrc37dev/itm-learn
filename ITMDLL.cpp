@@ -30,6 +30,52 @@
  * **********************************************/
 
 
+/** \defgroup LRprop Longley-Rice
+ *
+ * The Longley-Rice propagation program. This is the basic program; it returns
+ * the reference attenuation \f$aref\f$.
+ *
+ */
+
+/** \defgroup diff Diffraction Region
+ * \ingroup LRprop
+ *
+ * This is the region beyond the smooth-earth horizon at \f$d_{Lsa}\f$ and
+ * short of where tropospheric scatter takes over. It is a key central region
+ * and the associated coefficients must always be computed.
+ *
+ */
+
+/** \defgroup tropo Troposcatter Region
+ * \ingroup LRprop
+ */
+
+/** \defgroup los Line-of-sight Region
+ * \ingroup LRprop
+ */
+
+/** \defgroup stat Statistics
+ *
+ * LRprop will stand alone to compute \f$aref\f$. To complete the story,
+ * however, one must find the quantiles of the attenuation and this is what
+ * avar will do. It, too, is a stand alone subroutine, except that it requires
+ * the output from LRprop, as well as values in a "variability parameters"
+ * common block.
+ *
+ */
+
+/** \defgroup prep Preparatory Subroutines
+ *
+ * These are used to introduce input parameters for LRprop. One first calls
+ * qlrps and then either qlra (for the area prediction mode) or qlrpfl (for the
+ * point-to-point mode).
+ *
+ */
+
+/** \defgroup misc Miscellaneous Aids
+ *
+ */
+
 #include <math.h>
 #include <complex>
 #include <stdio.h>
@@ -209,6 +255,11 @@ struct prop_type
 	int mdp;
 };
 
+/** Variability parameters
+ *
+ * \ingroup stat
+ *
+ */
 
 struct propv_type
 {
@@ -217,6 +268,7 @@ struct propv_type
 	int mdvar;
 	int klim;
 };
+
 
 /** Secondary derived parameters
  *
@@ -386,6 +438,18 @@ double ahd(double td)
 	return a[i]+b[i]*td+c[i]*log(td);
 }
 
+/** Finds the "diffraction attenuation" at the distance d.
+ * It uses a convex combination of smooth earth diffraction and double
+ * knife-edge diffraction. A call with \f$d = 0\f$ sets up initial constants.
+ *
+ * @param d
+ * @param prop
+ * @param propa
+ * @return
+ *
+ * \ingroup diff
+ *
+ */
 double  adiff( double d, prop_type &prop, propa_type &propa)
 {
 	complex<double> prop_zgnd(prop.zgndreal,prop.zgndimag);
@@ -599,36 +663,51 @@ void /*DllExport _stdcall*/ qlra( int kst[], int klimx, int mdvarx,
  * \param propa Secondary parameters
  * \return aref Reference attenuation
  *
+ * \ingroup LRprop
+ *
  */
 void /*DllExport _stdcall*/ lrprop (double d,
 		prop_type &prop, propa_type &propa)  // PaulM_lrprop
 {
 
-	/** \internal
-	 *  \todo Figure out why these are static
+	/** \todo Figure out why these are static
+	 *
+	 * \internal
 	 *
 	 */
 	static bool wlos, wscat;
 	static double dmin, xae;
 
-	/** \internal
-	 *  \todo Figure out what these do.
+	/** Surface transfer impedance of the ground \f$Z_{g}\f$
+	 *
+	 * \internal
+	 *
 	 */
 	complex<double> prop_zgnd(prop.zgndreal,prop.zgndimag);
+
+	/** \todo Figure out what these do.
+	 *
+	 * \internal
+	 *
+	 */
 	double a0, a1, a2, a3, a4, a5, a6;
 	double d0, d1, d2, d3, d4, d5, d6;
 
-	/** \internal
-	 *  \todo Figure out what these do.
+	/** \todo Figure out what these do.
+	 *
+	 * \internal
+	 *
 	 */
 	bool wq;
 	double q;
 	int j;
 
-	/** LRprop 5
+	/** # LRprop 5
+	 *
+	 * \internal
 	 *
 	 */
-	/** \internal The value of mdp controls some of the program flow.
+	/** The value of mdp controls some of the program flow. \internal
 	 *  When it equals -1
 	 *  we are in the point-to-point mode, when 1 we are beginning the area
 	 *  mode, and when 0 we are continuing the area mode. The assumption is
@@ -636,31 +715,95 @@ void /*DllExport _stdcall*/ lrprop (double d,
 	 *  for varying distances.
 	 *
 	 */
+
+	/** We are either in point-to-point mode, or beginning area mode.
+	 *
+	 * \internal
+	 *
+	 */
 	if(prop.mdp != 0)
 	{
-		/** \internal Do secondary parameters
+		/** ## Do secondary parameters 6 \internal
+		 *
+		 */
+		/** ### Algorithm 3.5 \internal
+		 *
+		 * \f$d_{Lsj} = sqrt{2h_{ej}/\gamma_{e}}\f$, \f$j = 1, 2\f$
+		 *
+		 * \f$d_{Ls1}, d_{Ls2}\f$ are the distances from the transmitting
+		 * and receiving antennas, respectively, to their corresponding
+		 * horizons over a smooth earth (Longley, Rice, 3-19)
+		 *
+		 * When antennas are high and the terrain is relatively smooth, the
+		 * actual horizon distances \f$d_{L1}\f$ and \f$d_{L2}\f$ are
+		 * approximately equal to the smooth-earth horizon distances
+		 * \f$d_{Ls1}\f$ and \f$d_{Ls2}\f$. When antennas are low and
+		 * randomly located with respect to hills or other obstructions, as
+		 * with many tactical communication nets, the actual horizon distances
+		 * will vary greatly and their median values may be less than the
+		 * corresponding smooth-earth values. (Longley, Rice, 9)
 		 *
 		 */
 		for(j=0; j<2; j++)
-			propa.dls[j] = sqrt(2.0*prop.he[j]/prop.gme);	//Alg 3.5
-		propa.dlsa = propa.dls[0]+propa.dls[1];				//Alg 3.6
-		propa.dla  = prop.dl[0]+prop.dl[1];					//Alg 3.7
-		propa.tha  = mymax(prop.the[0] + prop.the[1],
-				-propa.dla * prop.gme); //Alg 3.8
-		wlos  = false;
-		wscat = false;
+			propa.dls[j] = sqrt(2.0*prop.he[j]/prop.gme);
 
-		/** \internal Check parameter ranges
+		/** ### Algorithm 3.6 \internal
+		 *
+		 * \f$d_{Ls} = d_{Ls1} + d_{Ls2}\f$
+		 *
+		 * The sum of the smooth-earth horizon distances \f$d_{Ls1}\f$ and
+		 * \f$d_{Ls2}\f$.
+		 *
 		 *
 		 */
-		/** \internal check wave number
+		propa.dlsa = propa.dls[0]+propa.dls[1];
+
+		/** ### Algorithm 3.7 \internal
+		 *
+		 * \f$d_{L} = d_{L1} + d_{L2}\f$
+		 *
+		 * The total distance \f$d_{L}\f$ between the antennas and their
+		 * horizons.
+		 *
+		 */
+		propa.dla  = prop.dl[0]+prop.dl[1];
+
+		/** ### Algorithm 3.8 \internal
+		 *
+		 * \f$\theta_{e} = max(\theta_{e1}+\theta_{e2}, -d_{L}\gamma_{e})\f$
+		 *
+		 * The sum of the elevation angles, or the total distance times earth's
+		 * effective curvature, whichever is larger algebraically.
+		 *
+		 */
+		propa.tha  = mymax(prop.the[0] + prop.the[1],
+				-propa.dla * prop.gme);
+
+		wlos  = false;
+		wscat = false;
+		//end 6
+
+		/** ## Check parameter ranges 7
+		 *
+		 * \internal
+		 *
+		 */
+		/** ### Check wave number
+		 *
+		 * \internal
+		 *
+		 * Wave number is between 0.838 and 210
+		 * (frequency is between 40 MHz and 10,000 MHz).
 		 *
 		 */
 		if(prop.wn < 0.838 || prop.wn > 210.0)
 		{
 			prop.kwx = mymax(prop.kwx, 1);
 		}
-		/** \internal check antenna heights
+
+		/** ### Check antenna heights
+		 *
+		 * \internal
 		 *
 		 */
 		for(j=0; j<2; j++)
@@ -668,7 +811,10 @@ void /*DllExport _stdcall*/ lrprop (double d,
 			{
 				prop.kwx = mymax(prop.kwx, 1);
 			}
-		/** \internal check horizon angles and distances
+
+		/** ### Check horizon angles and distances
+		 *
+		 * \internal
 		 *
 		 */
 		for(j=0; j<2; j++)
@@ -677,11 +823,17 @@ void /*DllExport _stdcall*/ lrprop (double d,
 			{
 				prop.kwx = mymax(prop.kwx, 3);
 			}
-        /** \internal check:
-         *  refractivity
-         *  earth curvature
-         *  ground impedance
-         *  wave number
+
+        /** ### Check
+         *
+         * \internal
+         *
+         *  - refractivity is between 250 and 400 N-units
+         *  - earth curvature
+         *  - ground impedance
+         *  - wave number is between 0.419 and 420 (frequency is between
+         *  20 MHz to 20,000 MHz)
+         *
          */
 		if( prop.ens < 250.0   || prop.ens > 400.0  ||
 				prop.gme < 75e-9 || prop.gme > 250e-9 ||
@@ -690,7 +842,12 @@ void /*DllExport _stdcall*/ lrprop (double d,
 		{
 			prop.kwx = 4;
 		}
-		/** \internal check antenna heights
+
+		/** ### Check antenna heights
+		 *
+		 * \internal
+		 *
+		 * Antenna heights must be between 0.5 m and 3,000 m.
 		 *
 		 */
 		for(j=0; j<2; j++)
@@ -698,40 +855,107 @@ void /*DllExport _stdcall*/ lrprop (double d,
 			{
 				prop.kwx = 4;
 			}
+
 		dmin = abs(prop.he[0] - prop.he[1]) / 200e-3;
 
-		/** \internal The Diffraction Region.
-		 *  This is the region beyond the smooth-earth horizon at dLsa and
+		/* # The Diffraction Region \internal
+		 *
+		 *  This is the region beyond the smooth-earth horizon at \f$d_{Lsa}\f$
+		 *  and
 		 *  short of where tropospheric scatter takes over. It is a key central
 		 *  region and the associated coefficients must always be computed.
 		 *
 		 */
 
-		/** \internal Diffraction coefficients
+		/** ## Diffraction coefficients 9
+		 *
+		 * \internal
 		 *
 		 */
+
 		q   = adiff(0.0, prop, propa);
-		xae = pow(prop.wn * pow(prop.gme, 2), -THIRD);	//Alg 4.2
-		d3  = mymax(propa.dlsa, 1.3787*xae + propa.dla);//Alg 4.3
-		d4  = d3 + 2.7574*xae;							//Alg 4.4
-		a3  = adiff(d3, prop, propa);					//Alg 4.5
-		a4  = adiff(d4, prop, propa);					//Alg 4.6
-		propa.emd = (a4-a3) / (d4-d3);					//Alg 4.7
-		propa.aed = a3 - propa.emd*d3;					//Alg 4.8
+
+		/** ### Algorithm 4.2 \internal
+		 *
+		 * \f$X_{ae} = (k\gamma_{e}^{2})^{-1/3}\f$
+		 *
+		 */
+		xae = pow(prop.wn * pow(prop.gme, 2), -THIRD);
+
+		/** ### Algorithm 4.3 \internal
+		 *
+		 * \f$d_{3} = max(d_{Ls}, d_{L} + 1.3787X_{ae})\f$
+		 *
+		 */
+		d3  = mymax(propa.dlsa, 1.3787*xae + propa.dla);
+
+		/** ### Algorithm 4.4 \internal
+		 *
+		 * \f$d_{4} = d_{3} + 2.7574X_{ae}\f$
+		 *
+		 */
+		d4  = d3 + 2.7574*xae;
+
+		/** ### Algorithm 4.5 \internal
+		 *
+		 * \f$A_{3} = A_{diff}(d_{3})\f$
+		 *
+		 */
+		a3  = adiff(d3, prop, propa);
+
+		/** ### Algorithm 4.6 \internal
+		 *
+		 * \f$A_{4} = A_{diff}(d_{4})\f$
+		 *
+		 */
+		a4  = adiff(d4, prop, propa);
+
+		/** ### Algorithm 4.7 \internal
+		 *
+		 * \f$m_{d} = (A_{4}-A_{3})/(d_{4}-d_{3})\f$ (4.7)
+		 *
+		 */
+		propa.emd = (a4-a3) / (d4-d3);
+
+		/** ### Algorithm 4.8 \internal
+		 *
+		 * \f$A_{ed} = A_{3} - m_{d}d_{3}\;\;\; (4.8)\f$
+		 *
+		 */
+		propa.aed = a3 - propa.emd*d3;
 	}
 
-    /** \internal We are starting or continuing area mode.
+    /** We are starting or continuing area mode.
+     *
+     * \internal
+     *
      */
 	if(prop.mdp >= 0)
 	{
+		/** mdp is changed to 0 so that on future calls we will be continuing
+		 * area mode (and thus skip secondary parameter calculation, parameter
+		 * range checking, and diffraction coefficient calculation).
+		 *
+		 * \internal
+		 *
+		 */
 		prop.mdp  = 0;
+
+		/** The distance between the terminals is set to the input \f$ d f\$,
+		 * thus allowing multiple runs in area mode with different distances.
+		 *
+		 * \internal
+		 *
+		 */
 		prop.dist = d;
 	}
 
 
 	if(prop.dist > 0.0)
 	{
-		/** \internal Check distance
+		/** ## Check distance 8
+		 *
+		 * \internal
 		 *
 		 */
 		if(prop.dist > 1000e3)
@@ -742,6 +966,10 @@ void /*DllExport _stdcall*/ lrprop (double d,
 		{
 			prop.kwx = mymax(prop.kwx, 3);
 		}
+
+		/** Distance must be greater than 1 km and less than 2,000 km.
+		 *
+		 */
 		if(prop.dist < 1e3 || prop.dist > 2000e3)
 		{
 			prop.kwx = 4;
@@ -749,61 +977,181 @@ void /*DllExport _stdcall*/ lrprop (double d,
 	}
 
 
+	/** We are in line-of-sight distance if \f$d < d_{Ls}\f$,
+	 * where \f$d_{Ls}\f$ is the total distance between the antennas
+	 * and their smooth-earth radio horizons.
+	 *
+	 * \internal
+	 *
+	 */
 	if(prop.dist < propa.dlsa)
 	{
-		/** \internal Line-of-sight calculations
+		/** ## Line-of-sight calculations 15
+		 *
+		 * \internal
 		 *
 		 */
 		if(!wlos)
 		{
-			/** \internal Line-of-sight coefficients
+			/** ## Line-of-sight coefficients 16
+			 *
+			 * \internal
+			 *
+			 */
+
+			/** We call alos with \f$d = 0\f$ to initialize the line-of-sight
+			 *  constants.
+			 *
+			 * \internal
 			 *
 			 */
 			q = alos(0.0, prop, propa);
+
+			/** \f$d_{2} = d_{Ls}\;\;\; (4.26)\f$
+			 *
+			 */
 			d2 = propa.dlsa;
+
+			/** \f$A_{2} = A_{ed} + m_{d}d_{2}\;\;\; (4.27)\f$
+			 *
+			 */
 			a2 = propa.aed + d2*propa.emd;
-			d0 = 1.908 * prop.wn * prop.he[0] * prop.he[1];			//Alg 4.38
+
+			/** \f$d_{0} = 1.908 k h_{e1} h_{e2}\;\;\; (4.38)\f$
+			 *
+			 */
+			d0 = 1.908 * prop.wn * prop.he[0] * prop.he[1];
+
 			if(propa.aed >= 0.0)
 			{
-				d0 = mymin(d0, 0.5*propa.dla);						//Alg 4.28
-				d1 = d0 + 0.25*(propa.dla - d0);					//Alg 4.29
+				/** ### Algorithm 4.28 \internal
+				 *
+				 * \f$d_{0} = min(1/2 d_{L}, 1.908kh_{e1}h_{e2})\f$
+				 *
+				 */
+				d0 = mymin(d0, 0.5*propa.dla);
+
+				/** ### Algorithm 4.29 \internal
+				 *
+				 * \f$d_{1} = 3/4 d_{0} + 1/4 d_{L}\f$
+				 *
+				 */
+				d1 = d0 + 0.25*(propa.dla - d0);
 			}
 			else
-				d1 = mymax(-propa.aed/propa.emd, 0.25*propa.dla);	//Alg 4.39
-			a1 = alos(d1, prop, propa);								//Alg 4.31
+				/** ### Algorithm 4.39 \internal
+				 *
+				 * \f$d_{1} = max(-A_{ed}/m_{d}, d_{L}/4)\f$
+				 *
+				 */
+				d1 = mymax(-propa.aed/propa.emd, 0.25*propa.dla);
+
+			/** ### Algorithm 4.31 \internal
+			 *
+			 * \f$A_{1} = A_{los}(d_{1})\f$
+			 *
+			 */
+			a1 = alos(d1, prop, propa);
 			wq = false;
+
 			if(d0 < d1)
 			{
-				a0 = alos(d0, prop, propa);							//Alg 4.30
+				/** ### Algorithm 4.30 \internal
+				 *
+				 * \f$A_{0} = A_{los}(d_{0})\f$
+				 *
+				 */
+				a0 = alos(d0, prop, propa);
+
 				q  = log(d2/d0);
+
+				/** ### Algorithm 4.32 \internal
+				 *
+				 * \todo Finish equation 4.32
+				 * \f$K_{2}' = max(0, )\f$
+				 *
+				 */
 				propa.ak2 = mymax(0.0, ((d2-d0)*(a1-a0) - (d1-d0)*(a2-a0)) /
 						((d2-d0)*log(d1/d0) - (d1-d0)*q));			//Alg 4.32
+
 				wq = propa.aed >= 0.0 || propa.ak2 > 0.0;
+
 				if(wq)
 				{
-					propa.ak1 = (a2 - a0 - propa.ak2*q) / (d2-d0);	//Alg 4.33
+					/** \f$K_{1}' = (A_{2}-A_{0}-K_{2}'ln(d_{2}/d_{0}))/
+					 * (d_{2}-d_{0})\;\;\; (4.33)\f$
+					 *
+					 */
+					propa.ak1 = (a2 - a0 - propa.ak2*q) / (d2-d0);
+
 					if(propa.ak1 < 0.0)
 					{
-						propa.ak1 = 0.0;							//Alg 4.36
-						propa.ak2 = FORTRAN_DIM(a2, a0) / q;		//Alg 4.35
+						/** \f$K_{1} = 0\;\;\; (4.36)\f$
+						 *
+						 * \internal
+						 *
+						 */
+						propa.ak1 = 0.0;
+
+						/** \f$K_{2}''=(A_{2}-A_{0})/ln(d_{2}/d_{0})\;\;\;(4.35)
+						 * \f$
+						 *
+						 * \internal
+						 *
+						 */
+						propa.ak2 = FORTRAN_DIM(a2, a0) / q;
+
 						if(propa.ak2 == 0.0)
-							propa.ak1 = propa.emd;					//Alg 4.37
-					} //end if
-				} //end if
-			} //end if
+							/** \f$K_{1} = m_{d}\;\;\; (4.37)
+							 *
+							 */
+							propa.ak1 = propa.emd;
+					}
+				}
+			}
+
 			if(!wq)
 			{
-				propa.ak1 = FORTRAN_DIM(a2, a1) / (d2-d1);			//Alg 4.40
-				propa.ak2 = 0.0;									//Alg 4.41
+				/** \f$K_{1}'' = (A_{2}-A_{1})/(d_{2}-d_{1})\;\;\; (4.40)\f$
+				 *
+				 * \internal
+				 *
+				 */
+				propa.ak1 = FORTRAN_DIM(a2, a1) / (d2-d1);
+
+				/** \f$K_{2} = 0\;\;\; (4.41)\f$
+				 *
+				 * \internal
+				 *
+				 */
+				propa.ak2 = 0.0;
+
 				if(propa.ak1 == 0.0)
-					propa.ak1 = propa.emd;							//Alg 4.37
+					/** \f$K_{1} = m_{d}\f$\;\;\; (4.37)\f$
+					 *
+					 * \internal
+					 *
+					 */
+					propa.ak1 = propa.emd;
 			}
-			propa.ael = a2 - propa.ak1*d2 - propa.ak2*log(d2);		//Alg 4.42
+
+			/** \f$A_{el} = A_{2} - K_{1}d_{2}\;\;\; (4.42)\f$
+			 *
+			 * \internal
+			 *
+			 */
+			propa.ael = a2 - propa.ak1*d2 - propa.ak2*log(d2);
+
 			wlos = true;
-		} //end if(!wlos)
+		}
 
 		if(prop.dist > 0.0)
-			prop.aref = propa.ael + propa.ak1*prop.dist +			//Alg 4.1
+			/** \f$A_{el} + K_{1}d + K_{2}ln(d/d_{Ls})\;\;\; (4.1)
+			 *
+			 * \internal
+			 *
+			 */
+			prop.aref = propa.ael + propa.ak1*prop.dist +
 			propa.ak2*log(prop.dist);
 	}
 
@@ -850,6 +1198,7 @@ void /*DllExport _stdcall*/ lrprop (double d,
 	//end 5
 	prop.aref = mymax(prop.aref, 0.0);
 }
+
 
 double curve (double const &c1, double const &c2, double const &x1,
 		double const &x2, double const &x3, double const &de)
